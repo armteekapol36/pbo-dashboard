@@ -222,10 +222,15 @@
   @media (prefers-color-scheme: dark) { .status-pending { color: var(--warning); } }
 
   .searchbox {
-    width: 100%; max-width: 320px; padding: 6px 10px; border-radius: 8px;
+    padding: 6px 10px; border-radius: 8px;
     border: 1px solid var(--border); background: var(--page); color: var(--text-primary);
-    font-size: 12px; margin-bottom: 10px;
+    font-size: 12px;
   }
+  .table-filter-row {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .table-filter-row .searchbox { flex: 2; min-width: 200px; }
+  select.searchbox { flex: 1; min-width: 180px; cursor: pointer; }
 
   footer { text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 24px; padding-bottom: 12px; }
   footer a { color: var(--series-1); }
@@ -450,7 +455,12 @@
     <div class="card full">
       <h2>รายการล่าสุด</h2>
       <p class="cap">แสดงทุกรายการตามปีที่กรอง เรียงจากวันที่ดำเนินการล่าสุด</p>
-      <input class="searchbox" id="searchBox" placeholder="ค้นหา (การไฟฟ้า, สถานที่, อุปกรณ์, ผู้ดำเนินการ...)" oninput="renderTable()">
+      <div class="table-filter-row">
+        <input class="searchbox" id="searchBox" placeholder="ค้นหา (การไฟฟ้า, สถานที่, อุปกรณ์, ผู้ดำเนินการ...)" oninput="renderTable()">
+        <select class="searchbox" id="resultFilter" onchange="renderTable()">
+          <option value="">ผลการดำเนินการ (ทั้งหมด)</option>
+        </select>
+      </div>
       <div class="table-scroll">
         <table>
           <thead>
@@ -797,9 +807,22 @@ function statusClass(result){
   return 'status-other';
 }
 
+function buildResultFilter(){
+  const sel = document.getElementById('resultFilter');
+  const current = sel.value;
+  const vals = [...new Set(currentRecent.map(r => r.result || '').filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">ผลการดำเนินการ (ทั้งหมด)</option>' +
+    vals.map(v => `<option value="${esc(v)}" ${v===current?'selected':''}>${esc(v)}</option>`).join('');
+}
+
 function renderTable(){
   const q = (document.getElementById('searchBox').value || '').trim().toLowerCase();
-  const rows = currentRecent.filter(r => !q || Object.values(r).join(' ').toLowerCase().includes(q));
+  const rf = (document.getElementById('resultFilter').value || '').trim();
+  const rows = currentRecent.filter(r => {
+    if (q && !Object.values(r).join(' ').toLowerCase().includes(q)) return false;
+    if (rf && (r.result || '') !== rf) return false;
+    return true;
+  });
   if (!rows.length) {
     document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:16px;">ไม่มีรายการ</td></tr>`;
     return;
@@ -829,6 +852,7 @@ function renderAll(){
   currentRecent = d.recent;
   buildKPIs(d);
   buildCharts(d);
+  buildResultFilter();
   renderTable();
   document.getElementById('personsTitle').textContent = 'ปริมาณงาน' + yearsLabel() + ' แยกตามผู้ดำเนินการ (Top 10)';
   renderVBarsPaired('chartPersons', computePersonsPairedByRecords(filtered), '--series-5', '--good', 'งานทั้งหมด', 'ใช้งานได้');
